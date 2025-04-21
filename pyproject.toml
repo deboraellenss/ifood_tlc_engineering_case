@@ -1,0 +1,24 @@
+[project]
+name = "tlc_pipeline"
+version = "0.0.1"
+authors = [
+  { name = "Debora", email = "deboraellenss2@gmail.com" },
+]
+description = "Integrar registros de viagens de táxi da cidade de Nova York de janeiro a maio de 2023 no ifood Data Lake"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/debora/tlc_pipeline"
+Issues = "https://github.com/debora/tlc_pipeline/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["src/tlc_pipeline"]

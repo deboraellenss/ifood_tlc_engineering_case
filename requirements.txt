@@ -1,0 +1,4 @@
+pyspark==3.4.1
+great_expectations
+boto3
+pandas

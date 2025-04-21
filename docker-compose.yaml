@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_ENDPOINT: "http://localhost:9000"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  airflow:
+    image: apache/airflow:2.7.0-python3.9
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - ./parquet_data:/opt/airflow/parquet_data
+    ports:
+      - "8080:8080"
+    command: webserver
+    depends_on:
+      - minio
+
+volumes:
+  minio_data:
