@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environment
+.venv/
+env/
+venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# PySpark temporary files
+*.crc
+
+# Arquivos temporários específicos do projeto
+*.tmp
+*.bak
+
+# Dados de saída ou resultados
+output/
+data/
