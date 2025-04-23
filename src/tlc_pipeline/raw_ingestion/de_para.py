@@ -4,10 +4,7 @@ import os
 import shutil
 
 # Cria sessão Spark
-spark = SparkSession.builder \
-    .appName("Unificar Dados Parquet") \
-    .getOrCreate()
-
+spark = SparkSession.builder.appName("Unificar Dados Parquet").getOrCreate()
 
 
 import os
@@ -19,17 +16,22 @@ from difflib import get_close_matches
 import json
 import csv
 
+
 def move_to_quarantine(file_path, quarantine_path="./quarantine"):
     os.makedirs(quarantine_path, exist_ok=True)
     try:
-        shutil.move(file_path, os.path.join(quarantine_path, os.path.basename(file_path)))
+        shutil.move(
+            file_path, os.path.join(quarantine_path, os.path.basename(file_path))
+        )
         print(f"🔁 Arquivo movido para quarentena: {file_path}")
     except Exception as e:
-        print(f"Erro ao mover {file_path} para quarentena: {e}") 
+        print(f"Erro ao mover {file_path} para quarentena: {e}")
+
 
 def exportar_de_para_json(de_para_dict, caminho_arquivo):
     with open(caminho_arquivo, "w", encoding="utf-8") as f:
         json.dump(de_para_dict, f, indent=2, ensure_ascii=False)
+
 
 def exportar_de_para_csv(de_para_dict, caminho_arquivo):
     with open(caminho_arquivo, "w", newline="", encoding="utf-8") as f:
@@ -37,6 +39,7 @@ def exportar_de_para_csv(de_para_dict, caminho_arquivo):
         writer.writerow(["nome_padrao", "colunas_equivalentes"])
         for nome_padrao, colunas in de_para_dict.items():
             writer.writerow([nome_padrao, ", ".join(colunas)])
+
 
 def corrigir_de_para_colunas_exclusivas(de_para_dict, colunas_exclusivas):
     novo_de_para = {}
@@ -54,26 +57,39 @@ def corrigir_de_para_colunas_exclusivas(de_para_dict, colunas_exclusivas):
                 novo_de_para[nome_padrao] = restantes
             for exclusiva in exclusivas_no_grupo:
                 novo_de_para[normalizar_coluna(exclusiva)] = [exclusiva]
+        
+        colunas_obrigatorias = ["tpep_pickup_datetime", "vendorid"]
+        for col in colunas_obrigatorias:
+            if col not in novo_de_para:
+                novo_de_para[col] = [col]
+
 
     return novo_de_para
 
 
 def normalizar_coluna(nome):
-    return re.sub(r'[^a-zA-Z0-9]', '', nome.strip().lower())
+    return re.sub(r"[^a-zA-Z0-9]", "", nome.strip().lower())
 
-def sugerir_de_para(spark, pasta_parquet, limite_similaridade=0.8, colunas_exclusivas=None):
+
+def sugerir_de_para(
+    spark, pasta_parquet, limite_similaridade=0.8, colunas_exclusivas=None
+):
     error_files = []
     if colunas_exclusivas is None:
         colunas_exclusivas = []
 
-    arquivos = [os.path.join(pasta_parquet, f) for f in os.listdir(pasta_parquet) if f.endswith(".parquet")]
+    arquivos = [
+        os.path.join(pasta_parquet, f)
+        for f in os.listdir(pasta_parquet)
+        if f.endswith(".parquet")
+    ]
     colunas_encontradas = set()
 
     for arquivo in arquivos:
         try:
             df = spark.read.parquet(arquivo)
             colunas_encontradas.update(df.columns)
-            
+
         except Exception as e:
             print(f"⚠️ Erro ao ler {arquivo}: {e}")
             error_files.append((arquivo, str(e)))
@@ -94,13 +110,17 @@ def sugerir_de_para(spark, pasta_parquet, limite_similaridade=0.8, colunas_exclu
             ja_agrupadas.add(col)
             continue
 
-        similares = get_close_matches(norm, colunas_normalizadas.values(), cutoff=limite_similaridade)
+
+        similares = get_close_matches(
+            norm, colunas_normalizadas.values(), cutoff=limite_similaridade
+        )
         grupo = [orig for orig, n in colunas_normalizadas.items() if n in similares]
         for g in grupo:
             ja_agrupadas.add(g)
         agrupamento[norm].extend(grupo)
 
     return agrupamento
+
 
 def padronizar_de_para(sugestoes, nomes_padrao_manualmente_definidos=None):
     """
@@ -114,10 +134,13 @@ def padronizar_de_para(sugestoes, nomes_padrao_manualmente_definidos=None):
         if len(variantes) == 1:
             nome_final = variantes[0]
         else:
-            nome_final = nomes_padrao_manualmente_definidos.get(f"coluna_{i}", f"coluna_{i}")
+            nome_final = nomes_padrao_manualmente_definidos.get(
+                f"coluna_{i}", f"coluna_{i}"
+            )
         resultado[nome_final] = variantes
 
     return resultado
+
 
 def encontrar_coluna_padrao(coluna, padrao_colunas):
     for padrao, variantes in padrao_colunas.items():
@@ -125,29 +148,45 @@ def encontrar_coluna_padrao(coluna, padrao_colunas):
             return padrao
     return None
 
+
 def de_para(spark, directory):
 
     # Sugere o mapeamento de colunas
-    sugestoes = sugerir_de_para(spark, directory,  colunas_exclusivas=["PUlocationID", "DOlocationID", "vendorid"])
+    sugestoes = sugerir_de_para(
+        spark,
+        directory,
+        colunas_exclusivas=["PUlocationID", "DOlocationID", "vendorid", "tpep_pickup_datetime"],
+    )
 
     nomes_manualmente_definidos = {
-    "coluna_1": "VendorID",
-    "coluna_2": "request_datetime",
-    "coluna_3": "dropoff_datetime",
-    "coluna_4": "total_amount",
-    "coluna_5": "passenger_count",
+        "coluna_1": "VendorID",
+        "coluna_2": "request_datetime",
+        "coluna_3": "dropoff_datetime",
+        "coluna_4": "total_amount",
+        "coluna_5": "passenger_count",
     }
 
-    colunas_fixas = ["PUlocationID", "DOlocationID", "VendorID", "request_datetime"]
+    colunas_fixas = ["PUlocationID", "DOlocationID", "VendorID", "request_datetime", "tpep_pickup_datetime"]
 
- 
     de_para_raw = padronizar_de_para(sugestoes, nomes_manualmente_definidos)
 
     de_para_final = corrigir_de_para_colunas_exclusivas(de_para_raw, colunas_fixas)
 
+    
 
     # 4. Exporta para revisar
     exportar_de_para_json(de_para_final, "de_para.json")
     exportar_de_para_csv(de_para_final, "de_para.csv")
+    print("🔁🔁🔁🔁De para exportado para de_para.json e de_para.csv")
+
+    print("De-para sugerido:")
+    print(sugestoes)
+
+    print("De-para final corrigido:")
+    print(de_para_raw)
+
+    print("Colunas finais esperadas:")
+    print(de_para_final)
+
 
     return de_para_final

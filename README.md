@@ -1,3 +1,127 @@
-# TLC Pipeline
+# 🚕 TLC Pipeline Documentation
 
-This project integrates taxi trip records from New York City (January to May 2023) into the iFood Data Lake.
+## 🌟 Project Overview
+
+This project implements a data pipeline for processing New York City Taxi and Limousine Commission (TLC) trip data. The pipeline handles data ingestion, transformation, and storage in a structured format.
+
+## 🏗️ Pipeline Architecture
+
+The pipeline consists of several key components:
+
+1. **📥 Raw Data Ingestion**: Reads source data files (Parquet format)
+2. **🔄 Column Mapping**: Maps different column names to standardized formats
+3. **⚙️ Data Transformation**: Processes and standardizes the data
+4. **💾 Data Storage**: Writes processed data to a structured storage system
+
+## 🧩 Key Components
+
+### 📥 Raw Ingestion
+
+The raw ingestion process reads Parquet files from a source location and prepares them for further processing.
+
+#### 🔄 Column Mapping (De-Para)
+
+The pipeline includes a sophisticated column mapping system that:
+
+- 📝 Normalizes column names across different data sources
+- 🔍 Handles special/exclusive columns that need individual treatment
+- 🔗 Groups similar columns based on similarity metrics
+
+```python
+# Example usage:
+de_para = sugerir_de_para(spark, "path/to/parquet/files", limite_similaridade=0.8)
+```
+
+#### 🛠️ Column Mapping Functions
+
+1. **`sugerir_de_para()`**: Analyzes Parquet files to suggest column mappings based on similarity
+                         - 🚫 Handles error files by moving them to quarantine
+                         - 🏷️ Supports exclusive columns that should not be grouped
+                         - 🔍 Uses fuzzy matching to identify similar columns
+
+2. **`corrigir_de_para_colunas_exclusivas()`**: Refines column mappings by separating exclusive columns
+                         - ✅ Ensures mandatory columns like "tpep_pickup_datetime" and "vendorid" are included
+                         - 🔀 Creates individual mappings for exclusive columns
+
+3. **`exportar_de_para_csv()`** and **`exportar_de_para_json()`**: Export column mappings to CSV or JSON formats for reference and auditing
+
+### 💾 Data Writing
+
+The `write_to_raw_bucket()` function handles writing processed data to the destination storage:
+
+- 📊 Partitions data by year and month for efficient querying
+- 🛡️ Handles empty dataframes gracefully
+- ⚠️ Provides error handling and logging
+- 🔄 Supports both local and S3 paths
+
+```python
+# Example usage:
+success = write_to_raw_bucket(processed_df, "s3://bucket/path/to/output")
+```
+
+Key features:
+- 📂 Data is partitioned by source_type, year, and month
+- ⚡ Uses 20 partitions for balanced distribution
+- 🔄 Overwrites existing data in the target location
+
+## 🔄 Data Flow
+
+1. 📥 Source Parquet files are read
+2. 🔄 Column names are normalized and mapped using the de-para system
+3. ⚙️ Data is transformed and standardized
+4. 💾 Processed data is written to the destination with proper partitioning
+
+## ⚠️ Error Handling
+
+The pipeline includes robust error handling:
+- 🔒 Files that cannot be processed are moved to a quarantine directory
+- 📝 Detailed error messages are logged
+- 🛡️ Empty dataframes are handled gracefully
+
+## 🚀 Usage Examples
+
+```python
+# 1. Generate column mappings
+de_para = sugerir_de_para(spark, "input_data/", 
+                                               limite_similaridade=0.8,
+                                               colunas_exclusivas=["special_column1", "special_column2"])
+
+# 2. Refine mappings for exclusive columns
+refined_de_para = corrigir_de_para_colunas_exclusivas(de_para, 
+                                                                           colunas_exclusivas=["special_column1", "special_column2"])
+
+# 3. Export mappings for reference
+exportar_de_para_json(refined_de_para, "mappings/column_mappings.json")
+exportar_de_para_csv(refined_de_para, "mappings/column_mappings.csv")
+
+# 4. Process and write data
+write_to_raw_bucket(processed_df, "s3://raw-bucket/tlc_data/")
+```
+
+## 💡 Best Practices
+
+- 👀 Always review the generated column mappings before using them in production
+- 🔍 Monitor the quarantine directory for problematic files
+- 🎛️ Adjust the similarity threshold based on your data characteristics
+- ✅ Include all mandatory columns in your mapping
+
+## 📊 Project Structure
+
+```
+src/
+├── tlc_pipeline/
+│   ├── raw_ingestion/
+│   │   ├── de_para.py        # Column mapping functionality
+│   │   ├── write_to_raw_bucket.py  # Data writing functionality
+```
+
+## 📝 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+```
+
+To create this file, run:
+
+```bash
+mkdir -p $(dirname README.md)
+touch README.md

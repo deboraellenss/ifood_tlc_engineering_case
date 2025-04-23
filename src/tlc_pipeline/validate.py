@@ -1,13 +1,18 @@
-# validate.py
-
+import os
 import great_expectations as ge
 from great_expectations.data_context import get_context
+from great_expectations.profile.user_configurable_profiler import (
+    UserConfigurableProfiler,
+)
 from great_expectations.core.batch import RuntimeBatchRequest
+from great_expectations.checkpoint import SimpleCheckpoint
 from great_expectations.validator.validator import Validator
-from config import INPUT_BUCKET, get_spark_session
+from config import INPUT_BUCKET
+from utils.helpers import get_spark_session
+
 
 def validate_spark_dataframe(df, suite_name="taxi_suite"):
-    
+
     # Inicia contexto GE
     context = get_context()
 
@@ -24,9 +29,9 @@ def validate_spark_dataframe(df, suite_name="taxi_suite"):
         data_connectors={
             "runtime_connector": {
                 "class_name": "RuntimeDataConnector",
-                "batch_identifiers": ["default_identifier_name"]
+                "batch_identifiers": ["default_identifier_name"],
             }
-        }
+        },
     )
 
     # Define o batch com o dataframe em tempo de execução
@@ -38,11 +43,9 @@ def validate_spark_dataframe(df, suite_name="taxi_suite"):
         batch_identifiers={"default_identifier_name": "yellow_taxi_batch"},
     )
 
-
     # Cria o Validator com o batch
     validator: Validator = context.get_validator(
-        batch_request=batch_request,
-        expectation_suite=suite
+        batch_request=batch_request, expectation_suite=suite
     )
 
     # Expectativas principais
@@ -63,18 +66,47 @@ def validate_spark_dataframe(df, suite_name="taxi_suite"):
         "requestdatetime", min_value="2023-01-01", max_value="2023-05-31"
     )
 
-    validator.save_expectation_suite(discard_failed_expectations=False)
-    
+    # Step 4: Create (or load) a validator and build an expectation suite from full profiling
+    profiler = UserConfigurableProfiler(profile_dataset=validator)
+    suite = profiler.build_suite()
+
+    # Step 5: Save the full profiled expectation suite
+    context.save_expectation_suite(
+        expectation_suite=suite, expectation_suite_name=suite_name
+    )
+
+    # Step 6: Run validation with the new expectations using a Checkpoint
+    checkpoint = SimpleCheckpoint(
+        name=f"{suite_name}_temp_checkpoint",
+        data_context=context,
+        validator=validator,
+    )
+
+    result = checkpoint.run()
+
+    if not result["success"]:
+        raise Exception("Great Expectations validation failed.")
+
+    # Step 7: Build data docs (HTML report)
+    context.build_data_docs()
+
+    # Step 8: Return path to generated HTML report
+    docs_path = os.path.abspath(
+        "great_expectations/uncommitted/data_docs/local_site/index.html"
+    )
+    print(f"📊 Full profiling report saved at: {docs_path}")
 
     print("✅ Suite 'taxi_suite' criada com sucesso!")
+
 
 if __name__ == "__main__":
     from pyspark.sql import SparkSession
 
-    spark =  get_spark_session()
+    spark = get_spark_session()
 
     df_sample = spark.read.parquet(INPUT_BUCKET).limit(10000)
-    print(df_sample.columns)
+    # df_sample=df_sample.filter(df_sample.vendorid.isNotNull()).sample(0.01)
+
     df_sample.createOrReplaceTempView("sample_df")
 
     validate_spark_dataframe(df_sample)
