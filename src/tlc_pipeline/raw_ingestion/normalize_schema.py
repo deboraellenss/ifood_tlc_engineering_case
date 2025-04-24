@@ -89,6 +89,8 @@ def ler_e_padronizar_parquets(spark, pasta_parquet, de_para, colunas_finais=None
             .withColumn("source_type", lit(source_type))
             .withColumn("ingestion_date", current_timestamp())
             .withColumn("date_ref", lit(extract_date_reference(arquivo)))
+            .withColumn("year", col("tpep_pickup_datetime").substr(1, 4))
+            .withColumn("month", col("tpep_pickup_datetime").substr(6, 2))
         )
 
         # Adiciona colunas ausentes com None

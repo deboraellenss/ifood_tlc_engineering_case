@@ -1,6 +1,6 @@
 from tlc_pipeline.config import get_spark_session
 from tlc_pipeline.raw_ingestion.normalize_schema import read_and_standardize_parquets
-from tlc_pipeline.raw_ingestion.write_to_raw_bucket import write_to_raw_bucket
+from tlc_pipeline.utils.write_bucket import write_to_raw_bucket
 from tlc_pipeline.validate import validate_spark_dataframe
 from tlc_pipeline.utils.logging_config import setup_logging
 
