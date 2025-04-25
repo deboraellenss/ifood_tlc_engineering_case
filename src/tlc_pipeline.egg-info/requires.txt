@@ -1,9 +1,0 @@
-pyspark==3.4.1
-great_expectations
-boto3
-
-[dev]
-pytest
-black
-flake8
-pip-tools
