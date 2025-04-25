@@ -4,17 +4,19 @@ from datetime import datetime
 
 from bronze_layer import load_bronze_data
 from silver_layer import clean_data
-from gold_layer import save_gold_data
 
 from pyspark.sql import SparkSession
 
 
-def run_pipeline():
-    spark = SparkSession.builder.appName("YellowTaxiPipeline").getOrCreate()
+def run_bronze_layer():
+    spark = SparkSession.builder.appName("YellowTaxiBronze").getOrCreate()
+    load_bronze_data(spark)
 
+
+def run_silver_layer():
+    spark = SparkSession.builder.appName("YellowTaxiSilver").getOrCreate()
     df_bronze = load_bronze_data(spark)
-    df_silver = clean_data(df_bronze)  # inclui validação GE
-    save_gold_data(df_silver)
+    clean_data(df_bronze)
 
 
 with DAG(
@@ -25,6 +27,14 @@ with DAG(
     default_args={"owner": "data_engineer"},
 ) as dag:
 
-    run_etl = PythonOperator(
-        task_id="run_yellow_taxi_pipeline", python_callable=run_pipeline
+    bronze_task = PythonOperator(
+        task_id="run_bronze_layer",
+        python_callable=run_bronze_layer
     )
+
+    silver_task = PythonOperator(
+        task_id="run_silver_layer",
+        python_callable=run_silver_layer
+    )
+
+    bronze_task >> silver_task

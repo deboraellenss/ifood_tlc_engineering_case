@@ -1,9 +1,7 @@
 [project]
 name = "tlc_pipeline"
 version = "0.0.1"
-authors = [
-  { name="Debora", email="deboraellenss2@gmail.com" },
-]
+authors = [{ name="Debora", email="deboraellenss2@gmail.com" }]
 description = "Integrar registros de viagens de táxi da cidade de Nova York de janeiro a maio de 2023 no ifood Data Lake"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -12,14 +10,23 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[project.urls]
-Homepage = "https://github.com/debora/tlc_pipeline"
-Issues = "https://github.com/debora/tlc_pipeline/issues"
+dependencies = [
+    "pyspark==3.4.1",
+    "great_expectations>=0.16.8,<0.18.0",
+    "boto3"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "pip-tools"
+]
+
+[tool.setuptools.packages.find]
+where = ["src/tlc_pipeline"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.setuptools]
-packages = ["tlc_pipeline"]
-package-dir = {"" = "src"}
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

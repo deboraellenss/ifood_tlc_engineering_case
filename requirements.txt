@@ -1,4 +1,4 @@
 pyspark==3.4.1
-great_expectations
+great_expectations>=0.16.8,<0.18.0
 boto3
-pandas
+
