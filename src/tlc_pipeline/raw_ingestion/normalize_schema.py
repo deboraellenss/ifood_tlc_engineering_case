@@ -1,4 +1,3 @@
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, lit
 from config import TAXI_TYPES
 from functools import reduce
@@ -10,44 +9,44 @@ import re
 def extract_date_reference(file_path):
     """
     Extract date reference from filename.
-    
+
     Args:
         file_path: Path to the file
-        
+
     Returns:
         datetime: Extracted date or default date (1900-01-01)
     """
     # Regex to extract year and month: assumes something like *_2023_03.parquet
     date_pattern = re.compile(r"(\d{4})[_-](\d{2})")
     match = date_pattern.search(file_path)
-    
+
     if match:
         year, month = map(int, match.groups())
         try:
             return datetime(year, month, 1)
         except ValueError:
             print(f"Invalid date values in filename: {file_path}")
-    
+
     print(f"Could not extract date from filename: {file_path}")
     return datetime(1900, 1, 1)  # Default date
 
 
 def ler_e_padronizar_parquets(spark, pasta_parquet, de_para, colunas_finais=None):
     """
-        Read and standardize Parquet files from a given directory.
-        
-        Args:
-            spark (SparkSession): Active Spark session
-            pasta_parquet (str): Path to directory containing Parquet files
-            de_para (dict[str, list[str]]): Mapping of standardized column names to their variants
-            colunas_finais (list, optional): List of final columns to keep. Defaults to None (keep all)
-        
-        Returns:
-            DataFrame: A unified DataFrame with renamed and standardized columns, including metadata columns
-        
-        Raises:
-            ValueError: If no compatible files are found in the specified directory
-        """
+    Read and standardize Parquet files from a given directory.
+
+    Args:
+        spark (SparkSession): Active Spark session
+        pasta_parquet (str): Path to directory containing Parquet files
+        de_para (dict[str, list[str]]): Mapping of standardized column names to their variants
+        colunas_finais (list, optional): List of final columns to keep. Defaults to None (keep all)
+
+    Returns:
+        DataFrame: A unified DataFrame with renamed and standardized columns, including metadata columns
+
+    Raises:
+        ValueError: If no compatible files are found in the specified directory
+    """
     arquivos = [
         os.path.join(pasta_parquet, f)
         for f in os.listdir(pasta_parquet)
@@ -89,8 +88,6 @@ def ler_e_padronizar_parquets(spark, pasta_parquet, de_para, colunas_finais=None
             .withColumn("source_type", lit(source_type))
             .withColumn("ingestion_date", current_timestamp())
             .withColumn("date_ref", lit(extract_date_reference(arquivo)))
-            .withColumn("year", col("tpep_pickup_datetime").substr(1, 4))
-            .withColumn("month", col("tpep_pickup_datetime").substr(6, 2))
         )
 
         # Adiciona colunas ausentes com None

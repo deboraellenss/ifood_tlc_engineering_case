@@ -5,6 +5,9 @@ OUTPUT_BUCKET = "s3a://s3-us-east-1.amazonaws.com/prd_yellow_taxi_table/"
 MONTHS = ["01", "02", "03", "04", "05"]
 YEAR = "2023"
 
+START_DATE = "2023-01-01"
+END_DATE = "2023-05-01"
+
 RELEVANT_COLUMNS = [
     "vendorid",
     "passenger_count",
@@ -27,4 +30,3 @@ SPARK_CONFIG = {
     "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
     "spark.jars.packages": "org.apache.hadoop:hadoop-aws:3.3.2,com.amazonaws:aws-java-sdk-bundle:1.11.901",
 }
-

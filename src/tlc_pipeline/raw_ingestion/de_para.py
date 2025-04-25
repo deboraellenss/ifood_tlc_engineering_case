@@ -1,36 +1,45 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, col
+import logging
 import os
 import shutil
-
-# Cria sessão Spark
-spark = SparkSession.builder.appName("Unificar Dados Parquet").getOrCreate()
-
-
-import os
+import json
+import csv
 import re
 from collections import defaultdict
 from difflib import get_close_matches
+from typing import Dict, List, Optional
 
 
-import json
-import csv
 
 
-def move_to_quarantine(file_path, quarantine_path="./quarantine"):
+def move_to_quarantine(file_path: str, quarantine_path: str = "./quarantine") -> None:
+    """
+        Move a file to a quarantine directory for further investigation or processing.
+        
+        Args:
+            file_path (str): The path of the file to be moved to quarantine.
+            quarantine_path (str, optional): The directory where files will be moved. 
+                Defaults to "./quarantine".
+        
+        Prints a status message upon successful move or if an error occurs during the move operation.
+        """
     os.makedirs(quarantine_path, exist_ok=True)
     try:
         shutil.move(
             file_path, os.path.join(quarantine_path, os.path.basename(file_path))
         )
-        print(f"🔁 Arquivo movido para quarentena: {file_path}")
+        logging.info(f"🔁 Arquivo movido para quarentena: {file_path}")
     except Exception as e:
-        print(f"Erro ao mover {file_path} para quarentena: {e}")
+        logging.error(f"Erro ao mover {file_path} para quarentena: {e}")
 
 
-def exportar_de_para_json(de_para_dict, caminho_arquivo):
-    with open(caminho_arquivo, "w", encoding="utf-8") as f:
-        json.dump(de_para_dict, f, indent=2, ensure_ascii=False)
+def exportar_de_para_json(de_para_dict: Dict[str, List[str]], caminho_arquivo: str) -> None:
+    """Export the mapping dictionary to a JSON file."""
+    try:
+        with open(caminho_arquivo, "w", encoding="utf-8") as f:
+            json.dump(de_para_dict, f, indent=2, ensure_ascii=False)
+    except IOError as e:
+        logging.error(f"Failed to write to {caminho_arquivo}: {e}")
+        raise
 
 
 def exportar_de_para_csv(de_para_dict, caminho_arquivo):
@@ -41,7 +50,7 @@ def exportar_de_para_csv(de_para_dict, caminho_arquivo):
             writer.writerow([nome_padrao, ", ".join(colunas)])
 
 
-def corrigir_de_para_colunas_exclusivas(de_para_dict, colunas_exclusivas):
+def corrigir_de_para_colunas_exclusivas(de_para_dict: Dict[str, List[str]], colunas_exclusivas: List[str]) -> Dict[str, List[str]]:
     novo_de_para = {}
 
     for nome_padrao, colunas in de_para_dict.items():
@@ -57,12 +66,11 @@ def corrigir_de_para_colunas_exclusivas(de_para_dict, colunas_exclusivas):
                 novo_de_para[nome_padrao] = restantes
             for exclusiva in exclusivas_no_grupo:
                 novo_de_para[normalizar_coluna(exclusiva)] = [exclusiva]
-        
+
         colunas_obrigatorias = ["tpep_pickup_datetime", "vendorid"]
         for col in colunas_obrigatorias:
             if col not in novo_de_para:
                 novo_de_para[col] = [col]
-
 
     return novo_de_para
 
@@ -72,8 +80,20 @@ def normalizar_coluna(nome):
 
 
 def sugerir_de_para(
-    spark, pasta_parquet, limite_similaridade=0.8, colunas_exclusivas=None
+    spark, pasta_parquet: str, limite_similaridade: float = 0.8, colunas_exclusivas: Optional[List[str]] = None
 ):
+    """
+        Suggests column mappings by grouping similar columns from Parquet files.
+        
+        Args:
+            spark: Spark session for reading Parquet files
+            pasta_parquet: Directory path containing Parquet files
+            limite_similaridade: Similarity threshold for column grouping (default 0.8)
+            colunas_exclusivas: List of columns to be grouped exclusively (optional)
+        
+        Returns:
+            A dictionary where keys are normalized column names and values are lists of original column names
+        """
     error_files = []
     if colunas_exclusivas is None:
         colunas_exclusivas = []
@@ -110,7 +130,6 @@ def sugerir_de_para(
             ja_agrupadas.add(col)
             continue
 
-
         similares = get_close_matches(
             norm, colunas_normalizadas.values(), cutoff=limite_similaridade
         )
@@ -122,7 +141,7 @@ def sugerir_de_para(
     return agrupamento
 
 
-def padronizar_de_para(sugestoes, nomes_padrao_manualmente_definidos=None):
+def padronizar_de_para(sugestoes: dict[str, list[str]], nomes_padrao_manualmente_definidos: dict[str, str] | None = None):
     """
     - sugestoes: dict[str, list[str]] vindo do sugerir_de_para()
     - nomes_padrao_manualmente_definidos: dict[str, str] onde a chave é o nome 'coluna_X' e o valor o nome real
@@ -142,20 +161,47 @@ def padronizar_de_para(sugestoes, nomes_padrao_manualmente_definidos=None):
     return resultado
 
 
-def encontrar_coluna_padrao(coluna, padrao_colunas):
+def encontrar_coluna_padrao(coluna: str, padrao_colunas: dict[str, list[str]]) -> str | None:
     for padrao, variantes in padrao_colunas.items():
         if coluna.lower() in [v.lower() for v in variantes]:
             return padrao
     return None
 
 
-def de_para(spark, directory):
+def de_para(spark, directory: str):
+    """
+    Generates a standardized column mapping for raw data ingestion.
+
+    Args:
+    spark: Active Spark session for reading Parquet files
+    directory (str): Path to the directory containing Parquet files to analyze
+
+    Returns:
+        dict: A dictionary of standardized column mappings where keys are standard column names 
+            and values are lists of equivalent column variants
+
+    Exports:
+        - de_para.json: JSON file with column mapping
+        - de_para.csv: CSV file with column mapping
+
+    This function performs the following steps:
+    1. Suggests column mappings using sugerir_de_para()
+    2. Applies manual column name definitions
+    3. Corrects mappings for exclusive columns
+    4. Exports the mapping to JSON and CSV files
+    5. Logs intermediate mapping details
+    """
 
     # Sugere o mapeamento de colunas
     sugestoes = sugerir_de_para(
         spark,
         directory,
-        colunas_exclusivas=["PUlocationID", "DOlocationID", "vendorid", "tpep_pickup_datetime"],
+        colunas_exclusivas=[
+            "PUlocationID",
+            "DOlocationID",
+            "vendorid",
+            "tpep_pickup_datetime",
+        ],
     )
 
     nomes_manualmente_definidos = {
@@ -166,27 +212,30 @@ def de_para(spark, directory):
         "coluna_5": "passenger_count",
     }
 
-    colunas_fixas = ["PUlocationID", "DOlocationID", "VendorID", "request_datetime", "tpep_pickup_datetime"]
+    colunas_fixas = [
+        "PUlocationID",
+        "DOlocationID",
+        "VendorID",
+        "request_datetime",
+        "tpep_pickup_datetime",
+    ]
 
     de_para_raw = padronizar_de_para(sugestoes, nomes_manualmente_definidos)
 
     de_para_final = corrigir_de_para_colunas_exclusivas(de_para_raw, colunas_fixas)
 
-    
-
     # 4. Exporta para revisar
     exportar_de_para_json(de_para_final, "de_para.json")
     exportar_de_para_csv(de_para_final, "de_para.csv")
-    print("🔁🔁🔁🔁De para exportado para de_para.json e de_para.csv")
+    logging.info("🔁🔁🔁🔁De para exportado para de_para.json e de_para.csv")
 
-    print("De-para sugerido:")
-    print(sugestoes)
+    logging.info(f"De-para sugerido:{sugestoes}")
 
-    print("De-para final corrigido:")
-    print(de_para_raw)
 
-    print("Colunas finais esperadas:")
-    print(de_para_final)
+    logging.info(f"De-para final corrigido:{de_para_raw}")
+
+
+    logging.info(f"Colunas finais esperadas:{de_para_final}")
 
 
     return de_para_final

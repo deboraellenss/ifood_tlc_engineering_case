@@ -7,7 +7,7 @@ from great_expectations.profile.user_configurable_profiler import (
 from great_expectations.core.batch import RuntimeBatchRequest
 from great_expectations.checkpoint import SimpleCheckpoint
 from great_expectations.validator.validator import Validator
-from config import INPUT_BUCKET
+from config import INPUT_BUCKET, START_DATE, END_DATE
 from utils.helpers import get_spark_session
 
 
@@ -56,14 +56,14 @@ def validate_spark_dataframe(df, suite_name="taxi_suite"):
     validator.expect_column_values_to_not_be_null("passenger_count")
     validator.expect_column_values_to_be_between("passenger_count", 1, 8)
 
-    validator.expect_column_values_to_not_be_null("fare_amount")
-    validator.expect_column_values_to_be_between("fare_amount", min_value=0.01)
+    validator.expect_column_values_to_not_be_null("total_amount")
+    validator.expect_column_values_to_be_between("total_amount", min_value=0.01)
 
-    validator.expect_column_values_to_not_be_null("requestdatetime")
-    validator.expect_column_values_to_not_be_null("dropoff_datetime")
+    validator.expect_column_values_to_not_be_null("tpep_pickup_datetime")
+    validator.expect_column_values_to_not_be_null("tpep_dropoff_datetime")
 
     validator.expect_column_values_to_be_between(
-        "requestdatetime", min_value="2023-01-01", max_value="2023-05-31"
+        "tpep_pickup_datetime", min_value=START_DATE, max_value=END_DATE
     )
 
     # Step 4: Create (or load) a validator and build an expectation suite from full profiling
